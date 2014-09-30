@@ -20,6 +20,8 @@ namespace EntityFramework.Batch
     /// </summary>
     public class SqlServerBatchRunner : IBatchRunner
     {
+        private static readonly Regex SELECT = new Regex("FROM");
+
         /// <summary>
         /// Create and run a batch delete statement.
         /// </summary>
@@ -103,21 +105,30 @@ namespace EntityFramework.Batch
                 sqlBuilder.Append(entityMap.TableName);
                 sqlBuilder.AppendLine();
 
-                sqlBuilder.AppendFormat("FROM {0} AS j0 INNER JOIN (", entityMap.TableName);
-                sqlBuilder.AppendLine();
-                sqlBuilder.AppendLine(innerSelect);
-                sqlBuilder.Append(") AS j1 ON (");
-
-                bool wroteKey = false;
-                foreach (var keyMap in entityMap.KeyMaps)
+                bool isSimple = SELECT.Matches(innerSelect).Count == 1;//TODO: really??
+                if (!isSimple)
                 {
-                    if (wroteKey)
-                        sqlBuilder.Append(" AND ");
+                    sqlBuilder.AppendFormat("FROM {0} AS j0 INNER JOIN (", entityMap.TableName);
+                    sqlBuilder.AppendLine();
+                    sqlBuilder.AppendLine(innerSelect);
+                    sqlBuilder.Append(") AS j1 ON (");
 
-                    sqlBuilder.AppendFormat("j0.[{0}] = j1.[{0}]", keyMap.ColumnName);
-                    wroteKey = true;
+                    bool wroteKey = false;
+                    foreach (var keyMap in entityMap.KeyMaps)
+                    {
+                        if (wroteKey)
+                            sqlBuilder.Append(" AND ");
+
+                        sqlBuilder.AppendFormat("j0.[{0}] = j1.[{0}]", keyMap.ColumnName);
+                        wroteKey = true;
+                    }
+                    sqlBuilder.Append(")");
                 }
-                sqlBuilder.Append(")");
+                else
+                {
+                    innerSelect = innerSelect.Substring(SELECT.Match(innerSelect).Index);
+                    sqlBuilder.Append(innerSelect);
+                }
 
                 deleteCommand.CommandText = sqlBuilder.ToString();
 
@@ -347,21 +358,31 @@ namespace EntityFramework.Batch
                 }
 
                 sqlBuilder.AppendLine(" ");
-                sqlBuilder.AppendFormat("FROM {0} AS j0 INNER JOIN (", entityMap.TableName);
-                sqlBuilder.AppendLine();
-                sqlBuilder.AppendLine(innerSelect);
-                sqlBuilder.Append(") AS j1 ON (");
 
-                bool wroteKey = false;
-                foreach (var keyMap in entityMap.KeyMaps)
+                bool isSimple = SELECT.Matches(innerSelect).Count == 1;//TODO: really??
+                if (!isSimple)
                 {
-                    if (wroteKey)
-                        sqlBuilder.Append(" AND ");
+                    sqlBuilder.AppendFormat("FROM {0} AS j0 INNER JOIN (", entityMap.TableName);
+                    sqlBuilder.AppendLine();
+                    sqlBuilder.AppendLine(innerSelect);
+                    sqlBuilder.Append(") AS j1 ON (");
 
-                    sqlBuilder.AppendFormat("j0.[{0}] = j1.[{0}]", keyMap.ColumnName);
-                    wroteKey = true;
+                    bool wroteKey = false;
+                    foreach (var keyMap in entityMap.KeyMaps)
+                    {
+                        if (wroteKey)
+                            sqlBuilder.Append(" AND ");
+
+                        sqlBuilder.AppendFormat("j0.[{0}] = j1.[{0}]", keyMap.ColumnName);
+                        wroteKey = true;
+                    }
+                    sqlBuilder.Append(")");
                 }
-                sqlBuilder.Append(")");
+                else
+                {
+                    innerSelect = innerSelect.Substring(SELECT.Match(innerSelect).Index);
+                    sqlBuilder.Append(innerSelect);
+                }
 
                 updateCommand.CommandText = sqlBuilder.ToString();
 
